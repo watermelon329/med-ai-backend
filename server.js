@@ -79,8 +79,14 @@ app.post("/api/diagnose", upload.single("image"), async (req, res) => {
   }
 });
 
-// Railway 用 PORT
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server listening on ${PORT}`);
+const PORT = process.env.PORT;
+
+if (!PORT) {
+  console.error("❌ PORT not provided by Railway");
+  process.exit(1);
+}
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server listening on ${PORT}`);
 });
+
