@@ -10,7 +10,7 @@ app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_KEY
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 // 測試 / 根路由
@@ -18,21 +18,40 @@ app.get("/", (req, res) => res.json({ status: "ok", msg: "Med-AI backend running
 
 // 語音轉文字 endpoint（POST /api/voice）
 // 上傳一個 field 名為 "audio" 的檔案 (blob)
-app.post("/api/voice", upload.single("audio"), async (req, res) => {
+app.post("/api/diagnose", upload.single("image"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: "Missing audio file" });
+    if (!req.file) return res.status(400).json({ error: "Missing image file" });
 
-    // 使用 OpenAI 的 audio transcription endpoint
-    // 這是示範呼叫，實際的 SDK 方法名可能隨版本不同，請依你安裝的 openai 套件文件為準
-    const transcription = await openai.audio.transcriptions.create({
-      file: req.file.buffer,
-      model: "gpt-4o-transcribe" // 若你的帳號沒有此模型，請改為你能用的 ASR 模型
+    const voiceText = req.body.voice || "";
+    const duration = req.body.duration || "";
+
+    const b64 = req.file.buffer.toString("base64");
+
+    const response = await openai.responses.create({
+      model: "gpt-4.1-mini",
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: "你是醫療初篩助手，請判斷外傷或皮膚病變，並給風險與建議。" },
+            { type: "input_text", text: `症狀描述：${voiceText}` },
+            { type: "input_text", text: `症狀時間：${duration}` },
+            {
+              type: "input_image",
+              image_base64: b64
+            }
+          ]
+        }
+      ]
     });
 
-    return res.json({ text: transcription.text ?? transcription });
+    res.json({
+      result: response.output_text
+    });
+
   } catch (err) {
-    console.error("voice error:", err);
-    return res.status(500).json({ error: "Failed to transcribe audio", detail: String(err) });
+    console.error(err);
+    res.status(500).json({ error: "AI analysis failed" });
   }
 });
 
@@ -51,14 +70,26 @@ app.post("/api/diagnose", upload.single("image"), async (req, res) => {
 
     // 用 Chat/vision 模型做初判（示範）
     const chatResponse = await openai.chat.completions.create({
-      model: "gpt-4o-mini-vision", // 若無此模型，請改為可用的 multimodal model
-      messages: [
-        { role: "user", content: "你是醫療初篩助手。請幫我判斷下列影像與敘述，給出：1) 分類 (外傷 / 皮膚病變 / 其他) 2) 初步風險 (低/中/高) 3) 建議（例如：觀察 / 門診 / 急診）" },
-        { role: "user", content: `語音摘要：${voiceText}\n症狀時間：${duration}` },
-        { role: "user", content: dataUrl }
-      ],
-      max_tokens: 400
-    });
+  model: "gpt-4o-mini",
+  messages: [
+    {
+      role: "user",
+      content: `
+你是醫療初篩助手。
+
+症狀描述：${voiceText}
+症狀時間：${duration}
+
+請回覆：
+1. 分類（外傷 / 皮膚病變 / 其他）
+2. 風險（低 / 中 / 高）
+3. 建議（觀察 / 門診 / 急診）
+`
+    }
+  ],
+  max_tokens: 300
+});
+
 
     const answer = chatResponse.choices?.[0]?.message?.content ?? JSON.stringify(chatResponse);
 
@@ -70,5 +101,5 @@ app.post("/api/diagnose", upload.single("image"), async (req, res) => {
 });
 
 // PORT from env (Railway will provide this), default 3000
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`Server listening on ${PORT}`));

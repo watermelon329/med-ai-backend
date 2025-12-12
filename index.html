@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>遠端醫療 AI 初判</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7fb;
+      padding: 30px;
+    }
+    .card {
+      max-width: 480px;
+      margin: auto;
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    h2 {
+      text-align: center;
+      color: #2563eb;
+    }
+    input, textarea, button {
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px;
+      font-size: 15px;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1e4fd1;
+    }
+    .result {
+      margin-top: 16px;
+      padding: 12px;
+      background: #eef2ff;
+      border-left: 4px solid #2563eb;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>遠端醫療 AI 初判</h2>
+
+  <label>上傳外傷 / 皮膚病變圖片</label>
+  <input type="file" id="imageInput" accept="image/*" />
+
+  <label>症狀描述（可直接打字）</label>
+  <textarea id="voice" placeholder="例如：昨天跌倒，膝蓋紅腫疼痛"></textarea>
+
+  <label>症狀持續時間</label>
+  <input id="duration" placeholder="例如：1天" />
+
+  <!-- ❌ 不要 onclick -->
+  <button id="sendBtn">送出 AI 分析</button>
+
+  <div id="result" class="result"></div>
+</div>
+
+<script>
+const API_BASE = "https://med-ai-backend-production.up.railway.app";
+
+window.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM loaded");
+
+  const btn = document.getElementById("sendBtn");
+
+  if (!btn) {
+    console.error("找不到 sendBtn");
+    return;
+  }
+
+  btn.addEventListener("click", async () => {
+    console.log("send button clicked");
+
+    const image = document.getElementById("imageInput").files[0];
+    const voice = document.getElementById("voice").value;
+    const duration = document.getElementById("duration").value;
+    const resultBox = document.getElementById("result");
+
+    if (!image) {
+      alert("請先上傳圖片");
+      return;
+    }
+
+    resultBox.innerText = "分析中，請稍候...";
+
+    const formData = new FormData();
+    formData.append("image", image);
+    formData.append("voice", voice);
+    formData.append("duration", duration);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/diagnose`, {
+        method: "POST",
+        body: formData
+      });
+
+      console.log("response status:", res.status);
+
+      const data = await res.json();
+      console.log("response data:", data);
+
+      resultBox.innerText =
+        data.result || JSON.stringify(data, null, 2);
+    } catch (err) {
+      console.error("fetch error:", err);
+      resultBox.innerText = "錯誤：" + err.message;
+    }
+  });
+});
+</script>
