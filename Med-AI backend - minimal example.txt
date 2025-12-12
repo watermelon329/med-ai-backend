@@ -1,0 +1,5 @@
+Med-AI backend - minimal example
+Endpoints:
+- GET /            -> health check
+- POST /api/voice  -> multipart form, field 'audio'
+- POST /api/diagnose -> multipart form, field 'image', optional form fields 'voice', 'duration'
